@@ -7,7 +7,6 @@ qwerty
 letmein
 1234567
 football
-fredbear
 iloveyou
 admin
 welcome
