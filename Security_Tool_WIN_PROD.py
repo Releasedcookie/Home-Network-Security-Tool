@@ -8,6 +8,8 @@ import telnetlib
 import paramiko # paramiko==2.7.2
 import re
 import numpy as np # numpy==1.19.3
+from tqdm import tqdm
+
 
 # -------------------------------------------------------------------------------------------------------------------------------------
 #   VERSION      AUTHOR        DATE          DESCRIPTION                             Email
@@ -32,7 +34,7 @@ vulnerabilities_counter = 0
 Host_Count = 0
 AttackTime = []
 
-# ------------------------------------------------------ TELENET ATTACK CODE ----------------------------------------------------
+# ------------------------------------------------- TELENET ATTACK CODE ---------------------------------------------------------
 def telnet_attack(tn, user, password):
     # ************************************** Connects to host
     # print("CHECKING THIS USERNAME: ", user)
@@ -56,7 +58,7 @@ def telnet_attack(tn, user, password):
     except socket.error:
         print("password failed to write")
 
-# ------------------------------------------------------ TELNET PICKING CODE ----------------------------------------------------------
+# ------------------------------------------------- TELNET PICKING CODE ---------------------------------------------------------
 def runTelnetAttack(host):
     passwordtrys = 0
     TelnetAttackTime = time.time()  # Time test
@@ -67,9 +69,9 @@ def runTelnetAttack(host):
     usernames = usernames.readlines()
     passwords = passwordlist.readlines()
 
-    for user in usernames:
+    for user in (usernames):
         user = user.strip()
-        for pwd in passwords:
+        for pwd in tqdm(passwords):
             tn = telnetlib.Telnet(host)
             password = pwd.strip()
             # print("CHECKING THIS HOST: ", host)
@@ -108,7 +110,7 @@ def runTelnetAttack(host):
     # usernames.close()
     passwordlist.close()
 
-# ------------------------------------------------------ SSH ATTACK  ------------------------------------------------------
+# ----------------------------------------------------- SSH ATTACK  -------------------------------------------------------------
 def run_SSH_ATTACK(host):
     PasswordFound = False
     passwordtrys = 0
@@ -120,9 +122,9 @@ def run_SSH_ATTACK(host):
 
     usernames = usernames.readlines()
     passwords = passwordlist.readlines()
-    for user in usernames:
+    for user in (usernames):
         user = user.strip()
-        for pwd in passwords:
+        for pwd in tqdm(passwords):
             password = pwd.strip()
             passwordtrys = passwordtrys + 1
             try:
@@ -144,14 +146,14 @@ def run_SSH_ATTACK(host):
         print("------------------------- Password Was Not Found ------------------------- ")
         #print("SSH ATTACK TIME WAS:", time.time() - SSHAttackTime, 'Seconds')
     else:
-        print("-------------------------  PASSWORD IS", password, "------------------------- ")
+        #print("-------------------------  PASSWORD IS", password, "------------------------- ")
         AttackTime.append([time.time() - SSHAttackTime, host])
         PasswordPosition.append(passwordtrys)
         print("SSH ATTACK TIME WAS:", time.time() - SSHAttackTime, 'Seconds')
     #usernames.close()
     passwordlist.close()
 
-# ------------------------------------------------------ Network Scoring Algorithm  ------------------------------------------------------
+# ----------------------------------------------- Network Scoring Algorithm  -----------------------------------------------------
 def NetworkScoreAlgorithm():
     if not AttackTime:
         print('***************************************************************************************')
@@ -238,7 +240,7 @@ def NetworkScoreAlgorithm():
 
     print('***************************************************************************************')
 
-# ------------------------------------------------------ Launch Test On Host  ------------------------------------------------------
+# -------------------------------------------------- Launch Test On Host  --------------------------------------------------------
 def Dictonary_Attack():
     for Target in ([IPAddress[0] for IPAddress in TelnetHosts]):
         print("Testing", Target + "'s Telnet Port...")
@@ -248,6 +250,33 @@ def Dictonary_Attack():
         print("Testing", Target + "'s SSH Port...")
         run_SSH_ATTACK(Target)
     NetworkScoreAlgorithm()
+
+# ------------------------------------------------ The Port Scanner Function -----------------------------------------------------
+def portscan(port):
+    s= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        con = s.connect((Up_Host,port))
+        with print_lock:
+            global vulnerabilities_counter
+            vulnerabilities_counter = (vulnerabilities_counter + 1)
+            # print('IP Address',Up_Host,'***** Port',port,'is open')
+            if (port == 23):
+                TelnetHosts.append([Up_Host, AvgPing])
+            if (port == 22):
+                SSHHosts.append([Up_Host, AvgPing])
+        con.close()
+    except:
+       # print('IP Address', Up_Host, '***** Port', port, 'is closed')
+       pass
+
+# -------------------------------------------- SPEEDS UP SCANNING WITH THREADING --------------------------------------------------
+def threader():
+        while True:
+            worker = q.get()
+            portscan(worker)
+            q.task_done() #finish
+
+
 
 #******************************************************* Picking of Target Network **********************************************************/
 # Gets the hostname and IP address of current machine
@@ -267,12 +296,14 @@ if picked_network_submask == "":
 
 # Get all of the hosts from the subnet and starts to Scan
 ip_net = ipaddress.ip_network(network_submask) #change IP too network_submask later
-print("Scanning IP Range" , network_submask + "...                   (This May Take Some Time)")
+print("Scanning IP Range" , network_submask + "...                   (This May Take Some Time To Start)")
 StartTime = time.time() # Time test
 All_Hosts = list(ip_net.hosts())  #selects all hosts from the sub-mask
 
+
 #******************************************************* Scans Target Network **********************************************************/
-for i in range(len(All_Hosts)):
+for i in tqdm(range(len(All_Hosts))):
+
     output = subprocess.Popen(['ping', '-n', '1', '-w', '500', str(All_Hosts[i])], stdout=subprocess.PIPE).communicate()[0]
 
     if "Destination host unreachable" in output.decode('utf-8'):
@@ -293,35 +324,11 @@ for i in range(len(All_Hosts)):
             if "Minimum" in b:
                 AvgPing = int(re.search(r'\d+', str(re.findall(r'Average =\s\d*',b))).group())
                 #print("Packet Average: " + str(AvgPing))
-#*************************************************** IF HOST UP THEN SCAN PORTS ****************************************/
-        def portscan(port):
-            s= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                con = s.connect((Up_Host,port))
-                with print_lock:
-                    global vulnerabilities_counter
-                    vulnerabilities_counter = (vulnerabilities_counter + 1)
-                    # print('IP Address',Up_Host,'***** Port',port,'is open')
-                    if (port == 23):
-                        TelnetHosts.append([Up_Host, AvgPing])
-                    if (port == 22):
-                        SSHHosts.append([Up_Host, AvgPing])
-                con.close()
-            except:
-               pass
-             # print('IP Address', Up_Host, '***** Port', port, 'is closed')
 
-# *************************************************** SPEEDS UP SCANNING WITH THREADING ***************************************
-        def threader():
-                while True:
-                    worker = q.get()
-                    portscan(worker)
-                    q.task_done() #finish
-
-        q = Queue()
 # ************************************ Uses a worker per port *********
-
-        for x in range (20): # how many processes it runs at the same time LOWER FOR LOWER CPUs
+        q = Queue()
+        for x in range (20): # how
+            # many processes it runs at the same time LOWER FOR LOWER CPUs
             t = threading.Thread(target=threader) # target is Up_Host
             t.daemon # dies when thread dies
             t.start() # starts next thread
@@ -352,9 +359,10 @@ if vulnerabilities_counter > 0:
     print("Ethical Approval can only come from the person who owns the network and must be 16 or over")
     Ethical = (input("Does this program have permission to dictionary attack the network? (Yes or No): "))
     if Ethical.lower() == "yes":
-         print('***************************************************************************************')
-         Dictonary_Attack()
+        print('***************************************************************************************')
+        Dictonary_Attack()
     else:
         print("------ Value entered was not 'Yes' therefore program is terminating -------")
+    #Dictonary_Attack()
 print("-------------------------------------------------------------------------------------------------------------------")
 print('PROGRAM FINISHED - Run Time:', time.time() - StartTime)
