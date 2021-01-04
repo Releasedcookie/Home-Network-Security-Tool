@@ -1,4 +1,4 @@
-# home-network-security-tool
+# Home Network Security Tool
 This is a easy to use quick security tool to check the hosts on your network for obvious vulnerabilities
 
 This was dissertation project I created back in 2017/2018. I'd love to assure you that even though this code does run, I am a much better coder now. You can check out my dissertation called ["The investigation into IoT Security and Credential Management" here](https://drive.google.com/file/d/1g9ITfKl4SnVJKctgFr_E-rjV_ydnuF1Z/view?usp=sharing)
